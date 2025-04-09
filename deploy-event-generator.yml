@@ -1,0 +1,114 @@
+---
+- hosts: localhost
+  tasks:
+
+  - name: Get my public IP
+    community.general.ipify_facts:
+
+  - name: Create security group for outside communication
+    amazon.aws.ec2_security_group:
+      name: event-generator-sg
+      description: security group for outside communication for event-generator
+      region: us-east-1
+      rules:
+        - proto: all
+          group_name: event-generator-sg
+        - proto: tcp
+          cidr_ip: "{{ ipify_public_ip }}/32"
+          ports:
+          - 22
+
+  - name: Start event generator
+    amazon.aws.ec2_instance:
+      name: "event-generator"
+      key_name: "vockey"
+      instance_type: t4g.small
+      security_groups:
+        - hadoop-sg
+        - event-generator-sg
+      image_id: ami-05f417c208be02d4d
+      region: us-east-1
+      state: running
+      tags:
+        Group: event-generator
+      volumes:
+      - device_name: /dev/xvda
+        ebs:
+          volume_size: 25
+          delete_on_termination: true
+    register: ec2
+
+  - name: Wait for SSH to come up
+    wait_for:
+        host: "{{ item.public_dns_name }}"
+        port: 22
+        delay: 10
+        timeout: 300
+        state: started
+    loop: "{{ ec2.instances }}"
+
+  - meta: refresh_inventory
+
+- hosts: tag_Group_event_generator
+  become: yes
+  tasks:
+    - name: Install required packages
+      yum:
+        name:
+          - docker
+          - git
+          - python3
+        state: present
+
+    - name: Enable and start Docker
+      systemd:
+        name: docker
+        enabled: yes
+        state: started
+
+    - name: Add ec2-user to docker group
+      user:
+        name: ec2-user
+        groups: docker
+        append: yes
+    - name: Download Docker Compose
+      get_url:
+        url: "https://github.com/docker/compose/releases/download/v2.34.0/docker-compose-linux-aarch64"
+        dest: /usr/local/bin/docker-compose
+        mode: '0755'
+
+    - name: Clone generator project
+      git:
+        repo: "https://github.com/BigDataProcessingDeusto/PLVD_team_work_24-25"
+        dest: /home/ec2-user/news-stream
+        update: yes
+      become_user: ec2-user
+
+    - name: Create systemd service to auto-run docker compose on boot
+      copy:
+        dest: /etc/systemd/system/news-generator.service
+        content: |
+          [Unit]
+          Description=Start News Generator Docker Compose Project
+          After=network.target docker.service
+          Requires=docker.service
+
+          [Service]
+          User=ec2-user
+          WorkingDirectory=/home/ec2-user/news-stream
+          ExecStartPre=/usr/local/bin/docker-compose down
+          ExecStart=/usr/local/bin/docker-compose up -d --force-recreate
+          Restart=on-failure
+          TimeoutStartSec=0
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Reload systemd daemon
+      command: systemctl daemon-reexec
+
+    - name: Enable service to start on boot
+      systemd:
+        name: news-generator
+        enabled: yes
+        state: started
