@@ -15,6 +15,13 @@ producer = KafkaProducer(
 # Predefined values
 categories = ["tech", "sports", "politics", "entertainment", "finance"]
 device_types = ["mobile", "desktop", "tablet"]
+countries = [
+    "United States", "Canada", "United Kingdom", "Germany", "France",
+    "Australia", "India", "Brazil", "China", "Japan", "South Korea", "Russia",
+    "Mexico", "South Africa", "Italy", "Spain", "Argentina", "Nigeria",
+    "Egypt", "Saudi Arabia", "Turkey", "Thailand", "Vietnam", "Nigeria",
+    "Sweden", "Norway"
+]
 
 NUM_ARTICLES = 100
 NUM_USERS = 500
@@ -55,7 +62,7 @@ while True:
 
     # Random device and city
     device = random.choice(device_types)
-    city = faker.city()
+    country = random.choice(countries)
 
     # 30% chance to pick breaking article
     if random.random() < 0.3:
@@ -68,7 +75,7 @@ while True:
         "session_id": user_info["session_id"],
         "article_id": str(article["article_id"]),
         "category": article["category"],
-        "location": city,
+        "location": country,
         "device_type": device,
         "timestamp": int(time.time())
     }
