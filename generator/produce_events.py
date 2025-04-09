@@ -1,91 +1,88 @@
 import json
-import time
 import random
-from faker import Faker
-from kafka import KafkaProducer
+import time
 import uuid
+from datetime import datetime
+from kafka import KafkaProducer
 
-faker = Faker()
-
+# Kafka setup
 producer = KafkaProducer(
-    bootstrap_servers="kafka:9092",
-    value_serializer=lambda v: json.dumps(v).encode("utf-8")
+    bootstrap_servers='kafka:9092',
+    value_serializer=lambda v: json.dumps(v).encode('utf-8')
 )
 
-# Predefined values
-categories = ["tech", "sports", "politics", "entertainment", "finance"]
-device_types = ["mobile", "desktop", "tablet"]
+# Configuration
+categories = ["sports", "politics", "tech", "finance", "entertainment"]
+devices = ["mobile", "desktop", "tablet"]
 countries = [
-    "United States", "Canada", "United Kingdom", "Germany", "France",
-    "Australia", "India", "Brazil", "China", "Japan", "South Korea", "Russia",
-    "Mexico", "South Africa", "Italy", "Spain", "Argentina", "Nigeria",
-    "Egypt", "Saudi Arabia", "Turkey", "Thailand", "Vietnam", "Nigeria",
-    "Sweden", "Norway"
+    "Argentina", "Brazil", "Canada", "Germany", "Japan", "Spain",
+    "USA", "India", "France", "Australia", "UK"
 ]
 
-NUM_ARTICLES = 100
-NUM_USERS = 500
+# Generate fixed UUID article IDs per category
+def generate_articles():
+    return [str(uuid.uuid4()) for _ in range(20)]
 
-# Articles with categories
-articles = [
-    {"article_id": uuid.uuid4(), "category": random.choice(categories)}
-    for _ in range(NUM_ARTICLES)
-]
+articles_per_category = {cat: generate_articles() for cat in categories}
 
-# Choose a 'breaking news' article
-breaking_article = random.choice(articles)
-print(f"🚨 Breaking article ID: {breaking_article['article_id']} (category: {breaking_article['category']})")
+# Simulate breaking news on one finance article
+breaking_article = random.choice(articles_per_category["finance"])
 
-# Zipf-like weight for non-breaking articles
-article_weights = [NUM_ARTICLES - i for i in range(NUM_ARTICLES)]
+# Print mapping (optional)
+print("Breaking article (finance):", breaking_article)
 
-# User pool with session tracking
-users = {}
-for _ in range(NUM_USERS):
-    uid = uuid.uuid4()
-    users[str(uid)] = {
-        "session_id": str(uuid.uuid4()),
-        "session_events": 0
-    }
+# Simulate regular users and bot users
+regular_users = [f"user_{i}" for i in range(100)]
+bot_users = [f"bot_user_{i}" for i in range(3)]
 
-# Event loop
-event_count = 0
-while True:
-    user_id = random.choice(list(users.keys()))
-    user_info = users[user_id]
+def create_event(user_id=None, is_bot=False):
+    category = random.choices(categories, weights=[1, 1, 1, 2, 1])[0]  # Finance slightly favored
 
-    # Session rotation
-    if user_info["session_events"] >= 10:
-        user_info["session_id"] = str(uuid.uuid4())
-        user_info["session_events"] = 0
-    user_info["session_events"] += 1
-
-    # Random device and city
-    device = random.choice(device_types)
-    country = random.choice(countries)
-
-    # 30% chance to pick breaking article
-    if random.random() < 0.3:
-        article = breaking_article
+    # Breaking news spike
+    if random.random() < 0.1:
+        article_id = breaking_article
+        category = "finance"
     else:
-        article = random.choices(articles, weights=article_weights)[0]
+        article_id = random.choice(articles_per_category[category])
 
-    event = {
-        "user_id": user_id,
-        "session_id": user_info["session_id"],
-        "article_id": str(article["article_id"]),
-        "category": article["category"],
+    device = random.choice(devices)
+    country = random.choice(countries)
+    session_id = str(uuid.uuid4()) if not is_bot else f"bot_session_{user_id}"
+
+    return {
+        "user_id": user_id if user_id else random.choice(regular_users),
+        "article_id": article_id,
+        "timestamp": datetime.utcnow().isoformat(),
+        "category": category,
         "location": country,
         "device_type": device,
-        "timestamp": int(time.time())
+        "session_id": session_id
     }
 
-    producer.send("news_clicks", value=event)
-    event_count += 1
+def send_events():
+    while True:
+        events = []
 
-    # Print every 10 events
-    if event_count % 10 == 0:
-        print(f"Produced event #{event_count}: {event}")
+        # Normal traffic
+        for _ in range(10):
+            events.append(create_event())
 
-    # Simulate bursty activity
-    time.sleep(random.uniform(0.2, 2.0))
+        # Finance-engaged users
+        for _ in range(5):
+            events.append(create_event(user_id=random.choice(regular_users)))
+
+        # Bot traffic (burst mode)
+        for bot_id in bot_users:
+            for _ in range(random.randint(5, 10)):
+                events.append(create_event(user_id=bot_id, is_bot=True))
+
+        # Send all events
+        for event in events:
+            producer.send('news_events', event)
+
+        producer.flush()
+        print(f"[{datetime.utcnow().isoformat()}] Sent {len(events)} events")
+        time.sleep(1)  # New batch every second
+
+if __name__ == "__main__":
+    send_events()
