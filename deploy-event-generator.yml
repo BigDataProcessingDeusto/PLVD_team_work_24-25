@@ -84,6 +84,14 @@
         update: yes
       become_user: ec2-user
 
+    - name: Template docker-compose.yml with EC2 private IP
+      template:
+        src: templates/docker-compose.yml.j2
+        dest: /home/ec2-user/news-stream/docker-compose.yml
+        owner: ec2-user
+        group: ec2-user
+        mode: '0644'
+
     - name: Create systemd service to auto-run docker compose on boot
       copy:
         dest: /etc/systemd/system/news-generator.service
