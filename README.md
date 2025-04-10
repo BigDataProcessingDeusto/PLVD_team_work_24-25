@@ -15,7 +15,7 @@ $ sudo apt update && sudo apt install -y git python3.*-venv libffi-dev
 7. Access to `PLVD_team_work_24-25` directory: `cd PLVD_team_work_24-25`
 8. Install requirements: `pip install -r requirements.txt`
 9. Install event generator at AWS: `ansible-playbook -i inventory.aws_ec2.yml -u ec2-user --key-file=~/.ssh/vockey.pem deploy-event-generator.yml`
-10. To access to HDFS NameNode UI, you must create another SSH tunnel: `ssh -i ~/.ssh/vockey.pem -N -L 8080:<master-node-public-name>:8080 ec2-user@<master-node-public-name>`
+10. To access to HDFS NameNode UI, you must create another SSH tunnel: `ssh -i ~/.ssh/vockey.pem -N -L 8080:<event-generator-node-public-name>:8080 ec2-user@<event-generator-node-public-name>`
 11. Kafka will be accessible from the Hadoop Cluster at <event-generator-private-ip>:9094
 
 
