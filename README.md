@@ -3,7 +3,7 @@
 1. On a root terminal install git and python3.*-venv. This procedure could change depending on your OS: 
 
 ```
-$ sudo apt update && sudo apt install -y git python3.*-venv libffi-dev
+$ sudo apt update && sudo apt install -y git python3.*-venv libffi-dev gcc python3.*-dev
 ```
 
 1. Set AWS credentials at ~/.aws/credentials
